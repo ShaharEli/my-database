@@ -38,15 +38,29 @@ class Database():
             
     # Validates all supplied params match supplied data 
     def __check_by_all_params(self,entry, params):
+        valid_ops = {"gt":">","lt":"<","eq":"==", "gte":">=","lte":"<="} # later add gte & lte
         match = True
-        for k,v in params.items():
-            if k not in entry:
+        for key,value in params.items():
+            if key not in entry:
                 match = False
-                continue
-            if not entry[k] == v:
+                break
+            if isinstance(value,dict):
+                
+                for op,op_value in value.items():
+                    if op in valid_ops:
+                        match = eval(f"{entry[key]} {valid_ops[op]} {op_value}")
+                        if match==False:
+                            break
+                    else:
+                        match = False
+                        break
+                    
+            elif not entry[key] == value:
                 match = False
                 break
         return match
+
+    # 
             
     # Get by attribuets
     def find_by_params(self, table_name, params, attrs = "all"):
@@ -77,13 +91,11 @@ class Database():
         if not isinstance(data,dict):
             return "Data must be of type dict"
         metadata = table["metadata"]["items"]
+        strictVals = ["id", "createdAt", "updatedAt"]
         for key in list(data.keys()):
             if key not in list(metadata.keys()):
                 print(f'Column {key} is not valid, Ignoring...')
-                del data[key]
-            if update==True:
-            strictVals = ["id", "createdAt", "updatedAt"]
-
+                del data[key] 
         for k,v in metadata.items():
             if update==False:
                 if v["required"] == True:
@@ -147,8 +159,7 @@ class Database():
                 count+=1
                 tableHasChanged = True
                 for k,v in data.items():
-                    if k not in strictVals :
-                        table["data"][index][k] = v
+                    table["data"][index][k] = v
                 
                 
             index+=1
@@ -225,7 +236,8 @@ hi=Database("lala")
 # print(hi.loadById("zach",5))
 print(
     # hi.delete_by_params("zach",{"lovePizza":"ya"})
-    hi.update("zach",{"id":3}, {"lovePizza":"updated value"})
+
+    hi.find_by_params("zach", {"id":{"eqx":1}})
 )
 
 # hi.drop_table("zach")
