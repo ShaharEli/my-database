@@ -65,14 +65,14 @@ class Database():
         return results           
 
     # Get by id
-    def find_by_id(self, table_name, id):
-        data = self.find_by_params(table_name, {"id": id})
+    def find_by_id(self, table_name, id, attrs = "all"):
+        data = self.find_by_params(table_name, {"id": id}, attrs)
         if len(data) > 0: 
             return data[0]
         print("Id not found")
         return False
 
-
+    # Validate user input before sending to db
     def __check_data_is_valid(self, table,data,update=False):
         if not isinstance(data,dict):
             return "Data must be of type dict"
@@ -81,6 +81,9 @@ class Database():
             if key not in list(metadata.keys()):
                 print(f'Column {key} is not valid, Ignoring...')
                 del data[key]
+            if update==True:
+            strictVals = ["id", "createdAt", "updatedAt"]
+
         for k,v in metadata.items():
             if update==False:
                 if v["required"] == True:
@@ -122,6 +125,7 @@ class Database():
             print(e)
             return False
 
+    # Add list data in form of a list
     def bulk_add(self,table_name,data):
         if isinstance(data, list)==False:
             print("data needs to be a list")
@@ -135,15 +139,23 @@ class Database():
             print(f'{valid} not valid')
             return valid
         tableHasChanged = False
+        index=0
+        count=0
         for entry in table["data"]:
             match = self.__check_by_all_params(entry, params)
-            print(match, 'match')
             if match == True:
+                count+=1
                 tableHasChanged = True
-                entry = data
+                for k,v in data.items():
+                    if k not in strictVals :
+                        table["data"][index][k] = v
+                
+                
+            index+=1
         if tableHasChanged == True:
             with open(self.location+"/"+table_name+".json", 'w') as json_file:
                 json.dump(table, json_file)
+            print(f"{count} updated")
                     
 
     def add(self,table_name,data):
