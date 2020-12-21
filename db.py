@@ -189,7 +189,7 @@ class Database():
             print(e)
 
 
-    def __join_columns(self,table1_name,table2_name,field1=False, field2=False):
+    def join(self,table1_name,table2_name,field1=False, field2=False):
         try:
             table1 = self.__load(table1_name)
             table2 = self.__load(table2_name)
@@ -197,6 +197,8 @@ class Database():
             if table2_name in table1["metadata"]["fks"]:
                 field2="id"
                 field1= table1["metadata"]["fks"][table2_name]
+            if not field1 and not field2:
+                for entity1 in table1["data"]:
                     for entity2 in table2["data"]:
                         entity1[table2_name.title()]=entity2
                         joinedData.append(entity1)
@@ -206,9 +208,17 @@ class Database():
             if field2 not in table2["metadata"]["items"] and field2 != "id": 
                 return f" can't find field {field2} in table {table2_name}"
             for entity1 in table1["data"]:
+                added = False
                 for entity2 in table2["data"]:
-                    if entity1[field1]==entity2[field2]:
-                        entity1[table2_name.title()]=entity2
+                    if not added:
+                        try:
+                            if entity1[field1]==entity2[field2]:
+                                entity1[table2_name.title()]=entity2
+                                joinedData.append(entity1)
+                                added=True
+                        except:
+                            pass
+                if not added:
                     joinedData.append(entity1)
             return joinedData
         except Exception as e:
@@ -245,8 +255,8 @@ class Database():
                     new_table["metadata"]["items"][k]["type"]="number"
                     print("foreign key must be of type number (supplied {}) - changed accordingly".format(v['type']))
                     new_table["metadata"]["fks"][v["fk"]]=k
-        
-            with open(file_name, 'w') as json_file:
+
+            with open(self.location+"/"+ table_name +".json", 'w') as json_file:
                 json.dump(new_table, json_file)
             print('Table {} Created Succesfully'.format(table_name))
             return True
@@ -256,14 +266,12 @@ class Database():
 
 mydate = datetime.datetime.now()
 hi=Database("lala")
-# hi.create_table("nitzan",{"lovePizza":{"type":"string"},fks:{'nitzanId':""}})
+# hi.create_table("users",{"name":{"type":"string"},"relatedId":{"type":"string","fk": "zach"}})
 # print(hi.bulk_add("nitzan",[{"lovePizza":"na"},{"lovePizza":"s5"}]))
 
 # print(hi.loadById("zach",5))
+
 print(
     # hi.delete_by_params("zach",{"lovePizza":"ya"})
-   hi.join("zach","nitzan")
-    # hi.find_all("zach", {"id":{"gte":1}})
+   hi.join("users","zach")
 )
-
-# hi.drop_table("zach")
