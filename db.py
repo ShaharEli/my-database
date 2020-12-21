@@ -189,13 +189,14 @@ class Database():
             print(e)
 
 
-    def join(self,table1_name,table2_name,field1=False, field2=False):
+    def __join_columns(self,table1_name,table2_name,field1=False, field2=False):
         try:
             table1 = self.__load(table1_name)
             table2 = self.__load(table2_name)
             joinedData=[]
-            if not field1 or not field2:
-                for entity1 in table1["data"]:
+            if table2_name in table1["metadata"]["fks"]:
+                field2="id"
+                field1= table1["metadata"]["fks"][table2_name]
                     for entity2 in table2["data"]:
                         entity1[table2_name.title()]=entity2
                         joinedData.append(entity1)
@@ -222,13 +223,14 @@ class Database():
             new_table={
                 "data":[],
                 "currentId":0,
-                "metadata" :{"items":{}}
+                "metadata" :{"items":{},"fks":{}}
             }
             new_table["metadata"]["createdAt"]=str(datetime.datetime.now())
             if not isinstance(table,dict):
                 raise Exception("Table must be of type dict")
             for k,v in table.items():
-                if not isinstance(v,dict):
+                
+                if not isinstance(v,dict): 
                     raise Exception("Entity must be of type dict")
                 if "type" in v:
                     if v["type"] not in list(self.valid_types.keys()):
@@ -239,6 +241,11 @@ class Database():
                 if "required" in v:
                     if v["required"]==True:
                         new_table["metadata"]["items"][k]["required"]=True
+                if "fk" in v:
+                    new_table["metadata"]["items"][k]["type"]="number"
+                    print("foreign key must be of type number (supplied {}) - changed accordingly".format(v['type']))
+                    new_table["metadata"]["fks"][v["fk"]]=k
+        
             with open(file_name, 'w') as json_file:
                 json.dump(new_table, json_file)
             print('Table {} Created Succesfully'.format(table_name))
@@ -249,13 +256,13 @@ class Database():
 
 mydate = datetime.datetime.now()
 hi=Database("lala")
-# hi.create_table("nitzan",{"lovePizza":{"type":"string"}})
+# hi.create_table("nitzan",{"lovePizza":{"type":"string"},fks:{'nitzanId':""}})
 # print(hi.bulk_add("nitzan",[{"lovePizza":"na"},{"lovePizza":"s5"}]))
 
 # print(hi.loadById("zach",5))
 print(
     # hi.delete_by_params("zach",{"lovePizza":"ya"})
-   hi.join("zach","nitzan","lovePizza","lovePizza")
+   hi.join("zach","nitzan")
     # hi.find_all("zach", {"id":{"gte":1}})
 )
 
