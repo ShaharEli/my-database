@@ -10,10 +10,10 @@ class Database():
         if not os.path.exists(self.location):
               os.makedirs(self.location)
 
-    def load(self,table):
+    def load(self,table_name):
         try:
-            with open(self.location+"/"+table+".json") as f:
-                return json.load(f)["data"]
+            with open(self.location+"/"+table_name+".json") as json_file:
+                return json.load(json_file)["data"]
         except:
             return False
 
@@ -30,28 +30,28 @@ class Database():
             file_name =self.location+"/"+table_name+".json"
             if  os.path.exists(os.path.expanduser(file_name)):
                 raise Exception("Table already exists")
-            with open(file_name, 'w') as json_file:
-                new_table={
-                    "data":[],
-                    "metadata" :{"items":{}}
-                }
-                valid_types= ["string","number","boolean","date"]
-                new_table["metadata"]["createdAt"]=str(datetime.datetime.now())
-                if not isinstance(table,dict):
+            new_table={
+                "data":[],
+                "metadata" :{"items":{}}
+            }
+            valid_types= ["string","number","boolean","date"]
+            new_table["metadata"]["createdAt"]=str(datetime.datetime.now())
+            if not isinstance(table,dict):
+                raise Exception("Table must be of type dict")
+            for k,v in table.items():
+                if not isinstance(v,dict):
+                    raise Exception("Entity must be of type dict")
+                if "type" in v:
+                    if v["type"] not in valid_types:
+                        raise Exception("{} is not valid type choose one of the following:\n {}".format(v["type"],"\n".join(valid_types)))
+                else:
                     return False
-                for k,v in table.items():
-                    if not isinstance(v,dict):
-                        return False
-                    if "type" in v:
-                        if v["type"] not in valid_types:
-                            return False
-                    else:
-                        return False
-                    new_table["metadata"]["items"][k]={"type":v["type"],"required":False}
-                    print(0)    
-                    if "required" in v:
-                        if v["required"]==True:
-                            new_table["metadata"]["items"][k]["required"]=True
+                new_table["metadata"]["items"][k]={"type":v["type"],"required":False}
+                print(0)    
+                if "required" in v:
+                    if v["required"]==True:
+                        new_table["metadata"]["items"][k]["required"]=True
+            with open(file_name, 'w') as json_file:
                 json.dump(new_table, json_file)
             return True
         except Exception as e:
@@ -59,4 +59,5 @@ class Database():
             return False
     
 hi=Database("lala")
+hi.create_table("hello",{"pizza":{"type":"pepeorini"}})
 print(hi.load("my_man"))
