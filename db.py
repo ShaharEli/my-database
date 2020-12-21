@@ -29,7 +29,7 @@ class Database():
             print(e)
     
     # Getting all the table data except the metadata
-    def load_data(self,table_name):
+    def __load_data(self,table_name):
         try:
             with open(self.location+"/"+table_name+".json") as json_file:
                 return json.load(json_file)["data"]
@@ -38,14 +38,13 @@ class Database():
             
     # Validates all supplied params match supplied data 
     def __check_by_all_params(self,entry, params):
-        valid_ops = {"gt":">","lt":"<","eq":"==", "gte":">=","lte":"<="} # later add gte & lte
+        valid_ops = {"gt":">","lt":"<","eq":"==", "gte":">=","lte":"<="}
         match = True
         for key,value in params.items():
             if key not in entry:
                 match = False
                 break
             if isinstance(value,dict):
-                
                 for op,op_value in value.items():
                     if op in valid_ops:
                         match = eval(f"{entry[key]} {valid_ops[op]} {op_value}")
@@ -54,17 +53,15 @@ class Database():
                     else:
                         match = False
                         break
-                    
             elif not entry[key] == value:
                 match = False
                 break
         return match
 
-    # 
             
     # Get by attribuets
-    def find_by_params(self, table_name, params, attrs = "all"):
-        data = self.load_data(table_name)
+    def find_all(self, table_name, params, attrs = "all"):
+        data = self.__load_data(table_name)
         results = []
         for entry in data:
             match = self.__check_by_all_params(entry, params)
@@ -80,7 +77,7 @@ class Database():
 
     # Get by id
     def find_by_id(self, table_name, id, attrs = "all"):
-        data = self.find_by_params(table_name, {"id": id}, attrs)
+        data = self.find_all(table_name, {"id": id}, attrs)
         if len(data) > 0: 
             return data[0]
         print("Id not found")
@@ -91,7 +88,6 @@ class Database():
         if not isinstance(data,dict):
             return "Data must be of type dict"
         metadata = table["metadata"]["items"]
-        strictVals = ["id", "createdAt", "updatedAt"]
         for key in list(data.keys()):
             if key not in list(metadata.keys()):
                 print(f'Column {key} is not valid, Ignoring...')
@@ -160,8 +156,6 @@ class Database():
                 tableHasChanged = True
                 for k,v in data.items():
                     table["data"][index][k] = v
-                
-                
             index+=1
         if tableHasChanged == True:
             with open(self.location+"/"+table_name+".json", 'w') as json_file:
@@ -191,6 +185,31 @@ class Database():
             with open(self.location+"/"+table_name+".json", 'w') as json_file:
                 json.dump(table, json_file)
             print(f"{count} deleted")
+        except Exception as e:
+            print(e)
+
+
+    def join(self,table1_name,table2_name,field1=False, field2=False):
+        try:
+            table1 = self.__load(table1_name)
+            table2 = self.__load(table2_name)
+            joinedData=[]
+            if not field1 or not field2:
+                for entity1 in table1["data"]:
+                    for entity2 in table2["data"]:
+                        entity1[table2_name.title()]=entity2
+                        joinedData.append(entity1)
+                return joinedData
+            if field1 not in table1["metadata"]["items"] and field1 != "id":
+                return f" can't find field {field1} in table {table1_name}"
+            if field2 not in table2["metadata"]["items"] and field2 != "id": 
+                return f" can't find field {field2} in table {table2_name}"
+            for entity1 in table1["data"]:
+                for entity2 in table2["data"]:
+                    if entity1[field1]==entity2[field2]:
+                        entity1[table2_name.title()]=entity2
+                    joinedData.append(entity1)
+            return joinedData
         except Exception as e:
             print(e)
 
@@ -230,14 +249,14 @@ class Database():
 
 mydate = datetime.datetime.now()
 hi=Database("lala")
-# # hi.create_table("zach",{"lovePizza":{"type":"string"}})++++
-# # print(hi.bulkAdd("zach",[{"lovePizza":"ya"},{"lovePizza":"5"}]))
+# hi.create_table("nitzan",{"lovePizza":{"type":"string"}})
+# print(hi.bulk_add("nitzan",[{"lovePizza":"na"},{"lovePizza":"s5"}]))
 
 # print(hi.loadById("zach",5))
 print(
     # hi.delete_by_params("zach",{"lovePizza":"ya"})
-
-    hi.find_by_params("zach", {"id":{"eqx":1}})
+   hi.join("zach","nitzan","lovePizza","lovePizza")
+    # hi.find_all("zach", {"id":{"gte":1}})
 )
 
 # hi.drop_table("zach")
