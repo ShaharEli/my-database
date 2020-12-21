@@ -5,14 +5,14 @@ import datetime
 
 class Database():
 
-    def __init__(self):
-        self.location = os.path.expanduser("/pyDb")
-        if not os.path.exists(os.path.expanduser("/pyDb")):
-              os.makedirs(os.path.expanduser("/pyDb"))
+    def __init__(self,schema):
+        self.location = os.path.expanduser("/pyDb"+"/"+schema)
+        if not os.path.exists(self.location):
+              os.makedirs(self.location)
 
-    def load(self,schema):
+    def load(self,table):
         try:
-            with open(self.location+"/"+schema+".json") as f:
+            with open(self.location+"/"+table+".json") as f:
                 return json.load(f)["data"]
         except:
             return False
@@ -27,9 +27,10 @@ class Database():
 
     def create_table(self, table_name, table):
         try:
-            if  os.path.exists(os.path.expanduser(self.location+"/"+table_name+".json")):
+            file_name =self.location+"/"+table_name+".json"
+            if  os.path.exists(os.path.expanduser(file_name)):
                 raise Exception("Table already exists")
-            with open(self.location+"/"+table_name+".json", 'w') as json_file:
+            with open(file_name, 'w') as json_file:
                 new_table={
                     "data":[],
                     "metadata" :{"items":{}}
@@ -57,5 +58,5 @@ class Database():
             print(e)
             return False
     
-hi=Database()
+hi=Database("lala")
 print(hi.load("my_man"))
