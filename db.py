@@ -1,13 +1,15 @@
 import json
 import os
 import datetime
-
+import math
+from HashMap import HashMap
 
 class Database():
 
     def __init__(self,schema):
         self.location = os.path.expanduser("/pyDb"+"/"+schema)
         self.valid_types= {"string": str ,"number": int,"boolean": bool, "date": "date"}
+        self.block_size=10
         if not os.path.exists(self.location):
               os.makedirs(self.location)
 
@@ -15,7 +17,18 @@ class Database():
     def __load(self,table_name):
         try:
             with open(self.location+"/"+table_name+".json") as json_file:
-                return json.load(json_file)
+                table= json.load(json_file)
+                try:
+                    nextFile = table["nextFile"]
+                    while nextFile!=False:
+                        with open(self.location+nextFile) as next_file:
+                            json_file=json.load(next_file)
+                            table["data"]+=json_file["data"]
+                            nextFile=json_file["nextFile"]
+                except Exception as e:
+                    print(e)
+                finally:
+                    return table
         except Exception as e:
             print(e)
             return False
@@ -32,7 +45,18 @@ class Database():
     def __load_data(self,table_name):
         try:
             with open(self.location+"/"+table_name+".json") as json_file:
-                return json.load(json_file)["data"]
+                table =json.load(json_file)
+                try:
+                    nextFile = table["nextFile"]
+                    while nextFile!=False:
+                       with open(self.location+nextFile) as next_file:
+                            json_file=json.load(next_file)
+                            table["data"]+=json_file["data"]
+                            nextFile=json_file["nextFile"]
+                except Exception as e:
+                    print(e)
+                finally:
+                    return table["data"]
         except:
             return False
             
@@ -84,7 +108,7 @@ class Database():
         return False
 
     # Validate user input before sending to db
-    def __check_data_is_valid(self, table,data,update=False):
+    def __check_data_is_valid(self, table,data,table_name="",update=False):
         if not isinstance(data,dict):
             return "Data must be of type dict"
         metadata = table["metadata"]["items"]
@@ -116,6 +140,10 @@ class Database():
             data["id"]= table["currentId"]
             data["createdAt"] = str(datetime.datetime.now())
             table["data"].append(data)
+            tableIndex= table["index"]
+            if tableIndex!=False:
+                tableMap=HashMap(self.location,table_name)
+                tableMap.add(data[tableIndex],len(table["data"])-1)
         return True
     
     # Add list data in form of a list
@@ -123,11 +151,38 @@ class Database():
         try:
             table = self.__load(table_name)
             for entry in data:
-                isValid = self.__check_data_is_valid(table,entry)
+                isValid = self.__check_data_is_valid(table,entry,table_name)
                 if  isValid!=True:
                     raise Exception(isValid)
-            with open(self.location+"/"+table_name+".json", 'w') as json_file:
-                json.dump(table, json_file)
+            currentId = table["currentId"]
+            rangeOfFiles=int(math.ceil(currentId/self.block_size))
+            if currentId>self.block_size:
+                for file_to_add in range(rangeOfFiles):
+                    table_to_add=table.copy()
+                    size = file_to_add*self.block_size
+                    if file_to_add==0:
+                        table_to_add["data"]=table_to_add["data"][:self.block_size-1]
+                        table_to_add["nextFile"]="/{}ExtraData/{}{}.json".format(table_name,table_name,file_to_add+1)
+                        with open(self.location+"/"+table_name+".json", 'w') as json_file:
+                            json.dump(table_to_add, json_file)
+                    else:
+                        del table_to_add["metadata"]
+                        del table_to_add["currentId"]
+                        del table_to_add["index"]
+                        table_to_add["data"]=table_to_add["data"][size-1:self.block_size+size-1]
+                        if rangeOfFiles-1>file_to_add:
+                            table_to_add["nextFile"]="/{}{}.json".format(table_name,file_to_add+1)
+                        else:
+                            table_to_add["nextFile"]=False
+
+                        extraDataPath = self.location+"/"+table_name+"ExtraData/"
+                        if not os.path.exists(extraDataPath):
+                            os.makedirs(extraDataPath)
+                        with open(extraDataPath+table_name+str(file_to_add)+".json", 'w') as json_file:
+                            json.dump(table_to_add, json_file)
+            else:
+                with open(self.location+"/"+table_name+".json", 'w') as json_file:
+                    json.dump(table, json_file)
             return True
         except Exception as e:
             print(e)
@@ -142,7 +197,7 @@ class Database():
         
     def update(self, table_name, params, data):
         table = self.__load(table_name)
-        valid = self.__check_data_is_valid(table, data, True)
+        valid = self.__check_data_is_valid(table, data,"",True)
         if valid != True:
             print(f'{valid} not valid')
             return valid
@@ -162,6 +217,18 @@ class Database():
                 json.dump(table, json_file)
             print(f"{count} updated")
                     
+
+    def add_index(self,table_name,key):
+        table=self.__load(table_name)
+        tableMap=HashMap(self.location,table_name)
+        added= tableMap.bulk_add(table["data"],key)
+        if added==True:
+            table["index"]=key
+            with open(self.location+"/"+table_name+".json", 'w') as json_file:
+                json.dump(table, json_file)
+            print("index added")
+        else:
+            print("error adding index")
 
     def add(self,table_name,data):
         if isinstance(data, dict):
@@ -223,8 +290,7 @@ class Database():
             return joinedData
         except Exception as e:
             print(e)
-
-
+    
     def create_table(self, table_name, table):
         try:
             file_name =self.location+"/"+table_name+".json"
@@ -233,13 +299,14 @@ class Database():
             new_table={
                 "data":[],
                 "currentId":0,
+                "nextFile":False,
+                "index":False,
                 "metadata" :{"items":{},"fks":{}}
             }
             new_table["metadata"]["createdAt"]=str(datetime.datetime.now())
             if not isinstance(table,dict):
                 raise Exception("Table must be of type dict")
             for k,v in table.items():
-                
                 if not isinstance(v,dict): 
                     raise Exception("Entity must be of type dict")
                 if "type" in v:
@@ -267,11 +334,14 @@ class Database():
 mydate = datetime.datetime.now()
 hi=Database("lala")
 # hi.create_table("users",{"name":{"type":"string"},"relatedId":{"type":"string","fk": "zach"}})
-# print(hi.bulk_add("nitzan",[{"lovePizza":"na"},{"lovePizza":"s5"}]))
+print(hi.bulk_add("nitzan",[{"lovePizza":"878787efefefefefkjvld;akdjfcpdajcp;"}]))
 
 # print(hi.loadById("zach",5))
 
-print(
-    # hi.delete_by_params("zach",{"lovePizza":"ya"})
-   hi.join("users","zach")
-)
+# print(
+#     # hi.delete_by_params("zach",{"lovePizza":"ya"})
+#    hi.join("users","zach")
+# )
+# print(hi.find_all("nitzan",{}))
+
+# hi.add_index("nitzan","lovePizza")
